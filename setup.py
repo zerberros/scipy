@@ -32,13 +32,20 @@ else:
     import builtins
 
 CLASSIFIERS = """\
-Development Status :: 4 - Beta
+Development Status :: 5 - Production/Stable
 Intended Audience :: Science/Research
 Intended Audience :: Developers
-License :: OSI Approved
+License :: OSI Approved :: BSD License
 Programming Language :: C
 Programming Language :: Python
+Programming Language :: Python :: 2
+Programming Language :: Python :: 2.6
+Programming Language :: Python :: 2.7
 Programming Language :: Python :: 3
+Programming Language :: Python :: 3.2
+Programming Language :: Python :: 3.3
+Programming Language :: Python :: 3.4
+Programming Language :: Python :: 3.5
 Topic :: Software Development
 Topic :: Scientific/Engineering
 Operating System :: Microsoft :: Windows
@@ -49,7 +56,7 @@ Operating System :: MacOS
 """
 
 MAJOR = 0
-MINOR = 16
+MINOR = 18
 MICRO = 0
 ISRELEASED = False
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
@@ -68,7 +75,7 @@ def git_version():
         env['LANGUAGE'] = 'C'
         env['LANG'] = 'C'
         env['LC_ALL'] = 'C'
-        out = subprocess.Popen(cmd, stdout = subprocess.PIPE, env=env).communicate()[0]
+        out = subprocess.Popen(cmd, stdout=subprocess.PIPE, env=env).communicate()[0]
         return out
 
     try:
@@ -91,6 +98,7 @@ if os.path.exists('MANIFEST'):
 # a lot more robust than what was previously being used.
 builtins.__SCIPY_SETUP__ = True
 
+
 def get_version_info():
     # Adding the git rev number needs to be done inside
     # write_version_py(), otherwise the import of scipy.version messes
@@ -108,7 +116,7 @@ def get_version_info():
         GIT_REVISION = "Unknown"
 
     if not ISRELEASED:
-        FULLVERSION += '.dev+' + GIT_REVISION[:7]
+        FULLVERSION += '.dev0+' + GIT_REVISION[:7]
 
     return FULLVERSION, GIT_REVISION
 
@@ -151,18 +159,19 @@ if HAVE_SPHINX:
                 raise RuntimeError("Building Scipy failed!")
             BuildDoc.run(self)
 
+
 def generate_cython():
     cwd = os.path.abspath(os.path.dirname(__file__))
     print("Cythonizing sources")
     p = subprocess.call([sys.executable,
-                          os.path.join(cwd, 'tools', 'cythonize.py'),
-                          'scipy'],
-                         cwd=cwd)
+                         os.path.join(cwd, 'tools', 'cythonize.py'),
+                         'scipy'],
+                        cwd=cwd)
     if p != 0:
         raise RuntimeError("Running cythonize failed!")
 
 
-def configuration(parent_package='',top_path=None):
+def configuration(parent_package='', top_path=None):
     from numpy.distutils.misc_util import Configuration
     config = Configuration(None, parent_package, top_path)
     config.set_options(ignore_setup_xxx_py=True,
@@ -171,11 +180,12 @@ def configuration(parent_package='',top_path=None):
                        quiet=True)
 
     config.add_subpackage('scipy')
-    config.add_data_files(('scipy','*.txt'))
+    config.add_data_files(('scipy', '*.txt'))
 
     config.get_version('scipy/version.py')
 
     return config
+
 
 def setup_package():
 
@@ -194,24 +204,29 @@ def setup_package():
     build_requires = []
     try:
         import numpy
+        if (len(sys.argv) >= 2 and sys.argv[1] == 'bdist_wheel' and
+                sys.platform == 'darwin'):
+            # We're ony building wheels for platforms where we know there's
+            # also a Numpy wheel, so do this unconditionally.  See gh-5184.
+            build_requires = ['numpy>=1.7.1']
     except:
-        build_requires = ['numpy>=1.5.1']
+        build_requires = ['numpy>=1.7.1']
 
     metadata = dict(
-        name = 'scipy',
-        maintainer = "SciPy Developers",
-        maintainer_email = "scipy-dev@scipy.org",
-        description = DOCLINES[0],
-        long_description = "\n".join(DOCLINES[2:]),
-        url = "http://www.scipy.org",
-        download_url = "http://sourceforge.net/projects/scipy/files/scipy/",
-        license = 'BSD',
+        name='scipy',
+        maintainer="SciPy Developers",
+        maintainer_email="scipy-dev@scipy.org",
+        description=DOCLINES[0],
+        long_description="\n".join(DOCLINES[2:]),
+        url="https://www.scipy.org",
+        download_url="https://github.com/scipy/scipy/releases",
+        license='BSD',
         cmdclass=cmdclass,
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
-        platforms = ["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
+        platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
         test_suite='nose.collector',
-        setup_requires = build_requires,
-        install_requires = build_requires,
+        setup_requires=build_requires,
+        install_requires=build_requires,
     )
 
     if len(sys.argv) >= 2 and ('--help' in sys.argv[1:] or
@@ -230,8 +245,9 @@ def setup_package():
         FULLVERSION, GIT_REVISION = get_version_info()
         metadata['version'] = FULLVERSION
     else:
-        if len(sys.argv) >= 2 and sys.argv[1] == 'bdist_wheel':
-            # bdist_wheel needs setuptools
+        if (len(sys.argv) >= 2 and sys.argv[1] in ('bdist_wheel', 'bdist_egg')) or (
+                    'develop' in sys.argv):
+            # bdist_wheel/bdist_egg needs setuptools
             import setuptools
 
         from numpy.distutils.core import setup

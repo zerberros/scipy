@@ -196,7 +196,7 @@ def gaussian_filter1d(input, sigma, axis=-1, order=0, output=None,
     %(output)s
     %(mode)s
     %(cval)s
-    truncate : float
+    truncate : float, optional
         Truncate the filter at this many standard deviations.
         Default is 4.0.
 
@@ -479,10 +479,7 @@ def generic_gradient_magnitude(input, derivative, output=None,
             numpy.multiply(tmp, tmp, tmp)
             output += tmp
         # This allows the sqrt to work with a different default casting
-        if NumpyVersion(numpy.__version__) > '1.6.1':
-            numpy.sqrt(output, output, casting='unsafe')
-        else:
-            numpy.sqrt(output, output)
+        numpy.sqrt(output, output, casting='unsafe')
     else:
         output[...] = input[...]
     return return_value
@@ -607,8 +604,9 @@ def convolve(input, weights, output=None, mode='reflect', cval=0.0,
         Value to fill past edges of input if `mode` is 'constant'. Default
         is 0.0
     origin : array_like, optional
-        The `origin` parameter controls the placement of the filter.
-        Default is 0.
+        The `origin` parameter controls the placement of the filter, 
+        relative to the centre of the current element of the input.  
+        Default of 0 is equivalent to ``(0,)*input.ndim``.
 
     Returns
     -------
@@ -621,7 +619,7 @@ def convolve(input, weights, output=None, mode='reflect', cval=0.0,
 
     Notes
     -----
-    Each value in result is :math:`C_i = \\sum_j{I_{i+j-k} W_j}`, where
+    Each value in result is :math:`C_i = \\sum_j{I_{i+k-j} W_j}`, where
     W is the `weights` kernel,
     j is the n-D spatial index over :math:`W`,
     I is the `input` and k is the coordinate of the center of
@@ -634,9 +632,9 @@ def convolve(input, weights, output=None, mode='reflect', cval=0.0,
     on any one value, extends beyond an edge of `input`.
 
     >>> a = np.array([[1, 2, 0, 0],
-    ....    [5, 3, 0, 4],
-    ....    [0, 0, 0, 7],
-    ....    [9, 3, 0, 0]])
+    ...               [5, 3, 0, 4],
+    ...               [0, 0, 0, 7],
+    ...               [9, 3, 0, 0]])
     >>> k = np.array([[1,1,1],[1,1,0],[1,0,0]])
     >>> from scipy import ndimage
     >>> ndimage.convolve(a, k, mode='constant', cval=0.0)
@@ -658,9 +656,9 @@ def convolve(input, weights, output=None, mode='reflect', cval=0.0,
     edge of `input` to fill in missing values.
 
     >>> b = np.array([[2, 0, 0],
-                      [1, 0, 0],
-                      [0, 0, 0]])
-    >>> k = np.array([[0,1,0],[0,1,0],[0,1,0]])
+    ...               [1, 0, 0],
+    ...               [0, 0, 0]])
+    >>> k = np.array([[0,1,0], [0,1,0], [0,1,0]])
     >>> ndimage.convolve(b, k, mode='reflect')
     array([[5, 0, 0],
            [3, 0, 0],
@@ -679,13 +677,13 @@ def convolve(input, weights, output=None, mode='reflect', cval=0.0,
     `weights`.
 
     >>> c = np.array([[2, 0, 1],
-                      [1, 0, 0],
-                      [0, 0, 0]])
+    ...               [1, 0, 0],
+    ...               [0, 0, 0]])
     >>> k = np.array([[0, 1, 0],
-                      [0, 1, 0],
-                      [0, 1, 0],
-                      [0, 1, 0],
-                      [0, 1, 0]])
+    ...               [0, 1, 0],
+    ...               [0, 1, 0],
+    ...               [0, 1, 0],
+    ...               [0, 1, 0]])
     >>> ndimage.convolve(c, k, mode='nearest')
     array([[7, 0, 3],
            [5, 0, 2],
@@ -707,7 +705,7 @@ def uniform_filter1d(input, size, axis=-1, output=None,
     Parameters
     ----------
     %(input)s
-    size : integer
+    size : int
         length of uniform filter
     %(axis)s
     %(output)s
@@ -738,7 +736,7 @@ def uniform_filter(input, size=3, output=None, mode="reflect",
     Parameters
     ----------
     %(input)s
-    size : int or sequence of ints
+    size : int or sequence of ints, optional
         The sizes of the uniform filter are given for each axis as a
         sequence, or as a single number, in which case the size is
         equal for all axes.
@@ -1030,7 +1028,7 @@ def rank_filter(input, rank, size=None, footprint=None, output=None,
     Parameters
     ----------
     %(input)s
-    rank : integer
+    rank : int
         The rank parameter may be less then zero, i.e., rank = -1
         indicates the largest element.
     %(size_foot)s

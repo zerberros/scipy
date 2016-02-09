@@ -1,5 +1,4 @@
-"""
-========================================
+"""========================================
 Interpolation (:mod:`scipy.interpolate`)
 ========================================
 
@@ -22,13 +21,12 @@ Univariate interpolation
    interp1d
    BarycentricInterpolator
    KroghInterpolator
-   PiecewisePolynomial
    PchipInterpolator
    barycentric_interpolate
    krogh_interpolate
-   piecewise_polynomial_interpolate
    pchip_interpolate
    Akima1DInterpolator
+   CubicSpline
    PPoly
    BPoly
 
@@ -84,6 +82,7 @@ Functional interface to FITPACK functions:
    spalde
    splder
    splantider
+   insert
 
 
 2-D Splines
@@ -139,6 +138,19 @@ Additional tools
    `scipy.signal.qspline2d`,
    `scipy.signal.cspline2d`.
 
+Functions existing for backward compatibility (should not be used in
+new code):
+
+.. autosummary::
+   :toctree: generated/
+
+   ppform
+   spleval
+   spline
+   splmake
+   spltopp
+   pchip
+
 """
 from __future__ import division, print_function, absolute_import
 
@@ -152,7 +164,7 @@ from .rbf import Rbf
 
 from .polyint import *
 
-from ._monotone import *
+from ._cubic import *
 
 from .ndgriddata import *
 

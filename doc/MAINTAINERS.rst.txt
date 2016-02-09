@@ -158,7 +158,6 @@ scipy.integrate
 Maintainers:
 
     - Pauli Virtanen
-    - Warren Weckesser
 
 Status:
 
@@ -264,7 +263,6 @@ scipy.signal
 
 Maintainers:
 
-    - Warren Weckesser
     - Ralf Gommers
     - Eric Moore
 
@@ -318,7 +316,6 @@ scipy.spatial
 
 Maintainers:
 
-    - Waren Weckesser
     - Pauli Virtanen (Qhull wrappers)
 
 Status:
@@ -344,7 +341,6 @@ scipy.stats
 Maintainers:
 
     - Josef Perktold
-    - Warren Weckesser
     - Ralf Gommers
     - Evgeni Burovski
 

@@ -10,13 +10,13 @@ significant power to the interactive Python session by providing the
 user with high-level commands and classes for manipulating and
 visualizing data. With SciPy an interactive Python session
 becomes a data-processing and system-prototyping environment rivaling
-sytems such as MATLAB, IDL, Octave, R-Lab, and SciLab.
+systems such as MATLAB, IDL, Octave, R-Lab, and SciLab.
 
 The additional benefit of basing SciPy on Python is that this also makes a
 powerful programming language available for use in developing
 sophisticated programs and specialized applications. Scientific
 applications using SciPy benefit from the development of
-additional modules in numerous niche's of the software landscape by
+additional modules in numerous niches of the software landscape by
 developers across the world. Everything from parallel programming to
 web and data-base subroutines and classes have been made available to
 the Python programmer. All of this power is available in addition to
@@ -86,7 +86,7 @@ Finding Documentation
 ---------------------
 
 SciPy and NumPy have documentation versions in both HTML and PDF format
-available at http://docs.scipy.org/, that cover nearly
+available at https://docs.scipy.org/, that cover nearly
 all available functionality. However, this documentation is still
 work-in-progress and some parts may be incomplete or sparse. As
 we are a volunteer organization and depend on the community for

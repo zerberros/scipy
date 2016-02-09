@@ -106,6 +106,7 @@ class csc_matrix(_cs_matrix, IndexMixin):
            [2, 3, 6]])
 
     """
+    format = 'csc'
 
     def transpose(self, copy=False):
         from .csr import csr_matrix
@@ -196,7 +197,6 @@ class csc_matrix(_cs_matrix, IndexMixin):
         """swap the members of x if this is a column-oriented matrix
         """
         return (x[1],x[0])
-
 
 def isspmatrix_csc(x):
     return isinstance(x, csc_matrix)

@@ -10,7 +10,6 @@ from numpy import mgrid, pi, sin, ogrid, poly1d, linspace
 import numpy as np
 
 from scipy._lib.six import xrange
-from scipy._lib._version import NumpyVersion
 
 from scipy.interpolate import (interp1d, interp2d, lagrange, PPoly, BPoly,
          ppform, splrep, splev, splantider, splint, sproot, Akima1DInterpolator,
@@ -106,6 +105,7 @@ class TestInterp2D(TestCase):
 class TestInterp1D(object):
 
     def setUp(self):
+        self.x5 = np.arange(5.)
         self.x10 = np.arange(10.)
         self.y10 = np.arange(10.)
         self.x25 = self.x10.reshape((2,5))
@@ -116,6 +116,10 @@ class TestInterp1D(object):
 
         self.y210 = np.arange(20.).reshape((2, 10))
         self.y102 = np.arange(20.).reshape((10, 2))
+        self.y225 = np.arange(20.).reshape((2, 2, 5))
+        self.y25 = np.arange(10.).reshape((2, 5))
+        self.y235 = np.arange(30.).reshape((2, 3, 5))
+        self.y325 = np.arange(30.).reshape((3, 2, 5))
 
         self.fill_value = -100.0
 
@@ -130,10 +134,34 @@ class TestInterp1D(object):
         interp1d(self.x10, self.y10, kind='quadratic')
         interp1d(self.x10, self.y10, kind='zero')
         interp1d(self.x10, self.y10, kind='nearest')
+        interp1d(self.x10, self.y10, kind='nearest', fill_value="extrapolate")
+        interp1d(self.x10, self.y10, kind='linear', fill_value="extrapolate")
+        interp1d(self.x10, self.y10, kind='linear', fill_value=(-1, 1))
+        interp1d(self.x10, self.y10, kind='linear',
+                 fill_value=np.array([-1]))
+        interp1d(self.x10, self.y10, kind='linear',
+                 fill_value=(-1,))
+        interp1d(self.x10, self.y10, kind='linear',
+                 fill_value=-1)
+        interp1d(self.x10, self.y10, kind='linear',
+                 fill_value=(-1, -1))
         interp1d(self.x10, self.y10, kind=0)
         interp1d(self.x10, self.y10, kind=1)
         interp1d(self.x10, self.y10, kind=2)
         interp1d(self.x10, self.y10, kind=3)
+        interp1d(self.x10, self.y210, kind='linear', axis=-1,
+                 fill_value=(-1, -1))
+        interp1d(self.x2, self.y210, kind='linear', axis=0,
+                 fill_value=np.ones(10))
+        interp1d(self.x2, self.y210, kind='linear', axis=0,
+                 fill_value=(np.ones(10), np.ones(10)))
+        interp1d(self.x2, self.y210, kind='linear', axis=0,
+                 fill_value=(np.ones(10), -1))
+
+        # extrapolation is only allowed for nearest & linear methods
+        for kind in ('cubic', 'slinear', 'zero', 'quadratic'):
+            assert_raises(ValueError, interp1d, self.x10, self.y10, kind=kind,
+                          fill_value="extrapolate")
 
         # x array must be 1D.
         assert_raises(ValueError, interp1d, self.x25, self.y10)
@@ -153,6 +181,26 @@ class TestInterp1D(object):
         assert_raises(ValueError, interp1d, self.x10, self.y1)
         assert_raises(ValueError, interp1d, self.x1, self.y1)
 
+        # Bad fill values
+        assert_raises(ValueError, interp1d, self.x10, self.y10, kind='linear',
+                      fill_value=(-1, -1, -1))  # doesn't broadcast
+        assert_raises(ValueError, interp1d, self.x10, self.y10, kind='linear',
+                      fill_value=[-1, -1, -1])  # doesn't broadcast
+        assert_raises(ValueError, interp1d, self.x10, self.y10, kind='linear',
+                      fill_value=np.array((-1, -1, -1)))  # doesn't broadcast
+        assert_raises(ValueError, interp1d, self.x10, self.y10, kind='linear',
+                      fill_value=[[-1]])  # doesn't broadcast
+        assert_raises(ValueError, interp1d, self.x10, self.y10, kind='linear',
+                      fill_value=[-1, -1])  # doesn't broadcast
+        assert_raises(ValueError, interp1d, self.x10, self.y10, kind='linear',
+                      fill_value=np.array([]))  # doesn't broadcast
+        assert_raises(ValueError, interp1d, self.x10, self.y10, kind='linear',
+                      fill_value=())  # doesn't broadcast
+        assert_raises(ValueError, interp1d, self.x2, self.y210, kind='linear',
+                      axis=0, fill_value=[-1, -1])  # doesn't broadcast
+        assert_raises(ValueError, interp1d, self.x2, self.y210, kind='linear',
+                      axis=0, fill_value=(0., [-1, -1]))  # above doesn't bc
+
     def test_init(self):
         # Check that the attributes are initialized appropriately by the
         # constructor.
@@ -163,6 +211,8 @@ class TestInterp1D(object):
         assert_(np.isnan(interp1d(self.x10, self.y10).fill_value))
         assert_equal(interp1d(self.x10, self.y10, fill_value=3.0).fill_value,
                      3.0)
+        assert_equal(interp1d(self.x10, self.y10, fill_value=(1.0, 2.0)).fill_value,
+                     (1.0, 2.0))
         assert_equal(interp1d(self.x10, self.y10).axis, 0)
         assert_equal(interp1d(self.x10, self.y210).axis, 1)
         assert_equal(interp1d(self.x10, self.y102, axis=0).axis, 0)
@@ -204,6 +254,17 @@ class TestInterp1D(object):
         assert_array_almost_equal(interp10([2.4, 5.6, 6.0]),
                                   np.array([2.4, 5.6, 6.0]))
 
+        # test fill_value="extrapolate"
+        extrapolator = interp1d(self.x10, self.y10, kind='linear',
+                                fill_value='extrapolate')
+        assert_allclose(extrapolator([-1., 0, 9, 11]),
+                        [-1, 0, 9, 11], rtol=1e-14)
+
+        opts = dict(kind='linear',
+                    fill_value='extrapolate',
+                    bounds_error=True)
+        assert_raises(ValueError, interp1d, self.x10, self.y10, **opts)
+
     def test_cubic(self):
         # Check the actual implementation of spline interpolation.
         interp10 = interp1d(self.x10, self.y10, kind='cubic')
@@ -219,6 +280,17 @@ class TestInterp1D(object):
         assert_array_almost_equal(interp10(1.2), np.array(1.))
         assert_array_almost_equal(interp10([2.4, 5.6, 6.0]),
                                   np.array([2., 6., 6.]),)
+
+        # test fill_value="extrapolate"
+        extrapolator = interp1d(self.x10, self.y10, kind='nearest',
+                                fill_value='extrapolate')
+        assert_allclose(extrapolator([-1., 0, 9, 11]),
+                        [0, 0, 9, 9], rtol=1e-14)
+
+        opts = dict(kind='nearest',
+                    fill_value='extrapolate',
+                    bounds_error=True)
+        assert_raises(ValueError, interp1d, self.x10, self.y10, **opts)
 
     @dec.knownfailureif(True, "zero-order splines fail for the last point")
     def test_zero(self):
@@ -240,7 +312,8 @@ class TestInterp1D(object):
                            np.array(self.fill_value),)
         assert_array_equal(extrap10._check_bounds(
                                np.array([-1.0, 0.0, 5.0, 9.0, 11.0])),
-                           np.array([True, False, False, False, True]))
+                           np.array([[True, False, False, False, False],
+                                     [False, False, False, False, True]]))
 
         raises_bounds_error = interp1d(self.x10, self.y10, bounds_error=True,
                                        kind=kind)
@@ -261,6 +334,180 @@ class TestInterp1D(object):
                      'slinear', 'zero', 'quadratic'):
             self._bounds_check(kind)
             self._bounds_check_int_nan_fill(kind)
+
+    def _check_fill_value(self, kind):
+        interp = interp1d(self.x10, self.y10, kind=kind,
+                          fill_value=(-100, 100), bounds_error=False)
+        assert_array_almost_equal(interp(10), 100)
+        assert_array_almost_equal(interp(-10), -100)
+        assert_array_almost_equal(interp([-10, 10]), [-100, 100])
+
+        # Proper broadcasting:
+        #    interp along axis of length 5
+        # other dim=(2, 3), (3, 2), (2, 2), or (2,)
+
+        # one singleton fill_value (works for all)
+        for y in (self.y235, self.y325, self.y225, self.y25):
+            interp = interp1d(self.x5, y, kind=kind, axis=-1,
+                              fill_value=100, bounds_error=False)
+            assert_array_almost_equal(interp(10), 100)
+            assert_array_almost_equal(interp(-10), 100)
+            assert_array_almost_equal(interp([-10, 10]), 100)
+
+            # singleton lower, singleton upper
+            interp = interp1d(self.x5, y, kind=kind, axis=-1,
+                              fill_value=(-100, 100), bounds_error=False)
+            assert_array_almost_equal(interp(10), 100)
+            assert_array_almost_equal(interp(-10), -100)
+            if y.ndim == 3:
+                result = [[[-100, 100]] * y.shape[1]] * y.shape[0]
+            else:
+                result = [[-100, 100]] * y.shape[0]
+            assert_array_almost_equal(interp([-10, 10]), result)
+
+        # one broadcastable (3,) fill_value
+        fill_value = [100, 200, 300]
+        for y in (self.y325, self.y225):
+            assert_raises(ValueError, interp1d, self.x5, y, kind=kind,
+                          axis=-1, fill_value=fill_value, bounds_error=False)
+        interp = interp1d(self.x5, self.y235, kind=kind, axis=-1,
+                          fill_value=fill_value, bounds_error=False)
+        assert_array_almost_equal(interp(10), [[100, 200, 300]] * 2)
+        assert_array_almost_equal(interp(-10), [[100, 200, 300]] * 2)
+        assert_array_almost_equal(interp([-10, 10]), [[[100, 100],
+                                                       [200, 200],
+                                                       [300, 300]]] * 2)
+
+        # one broadcastable (2,) fill_value
+        fill_value = [100, 200]
+        assert_raises(ValueError, interp1d, self.x5, self.y235, kind=kind,
+                      axis=-1, fill_value=fill_value, bounds_error=False)
+        for y in (self.y225, self.y325, self.y25):
+            interp = interp1d(self.x5, y, kind=kind, axis=-1,
+                              fill_value=fill_value, bounds_error=False)
+            result = [100, 200]
+            if y.ndim == 3:
+                result = [result] * y.shape[0]
+            assert_array_almost_equal(interp(10), result)
+            assert_array_almost_equal(interp(-10), result)
+            result = [[100, 100], [200, 200]]
+            if y.ndim == 3:
+                result = [result] * y.shape[0]
+            assert_array_almost_equal(interp([-10, 10]), result)
+
+        # broadcastable (3,) lower, singleton upper
+        fill_value = (np.array([-100, -200, -300]), 100)
+        for y in (self.y325, self.y225):
+            assert_raises(ValueError, interp1d, self.x5, y, kind=kind,
+                          axis=-1, fill_value=fill_value, bounds_error=False)
+        interp = interp1d(self.x5, self.y235, kind=kind, axis=-1,
+                          fill_value=fill_value, bounds_error=False)
+        assert_array_almost_equal(interp(10), 100)
+        assert_array_almost_equal(interp(-10), [[-100, -200, -300]] * 2)
+        assert_array_almost_equal(interp([-10, 10]), [[[-100, 100],
+                                                       [-200, 100],
+                                                       [-300, 100]]] * 2)
+
+        # broadcastable (2,) lower, singleton upper
+        fill_value = (np.array([-100, -200]), 100)
+        assert_raises(ValueError, interp1d, self.x5, self.y235, kind=kind,
+                      axis=-1, fill_value=fill_value, bounds_error=False)
+        for y in (self.y225, self.y325, self.y25):
+            interp = interp1d(self.x5, y, kind=kind, axis=-1,
+                              fill_value=fill_value, bounds_error=False)
+            assert_array_almost_equal(interp(10), 100)
+            result = [-100, -200]
+            if y.ndim == 3:
+                result = [result] * y.shape[0]
+            assert_array_almost_equal(interp(-10), result)
+            result = [[-100, 100], [-200, 100]]
+            if y.ndim == 3:
+                result = [result] * y.shape[0]
+            assert_array_almost_equal(interp([-10, 10]), result)
+
+        # broadcastable (3,) lower, broadcastable (3,) upper
+        fill_value = ([-100, -200, -300], [100, 200, 300])
+        for y in (self.y325, self.y225):
+            assert_raises(ValueError, interp1d, self.x5, y, kind=kind,
+                          axis=-1, fill_value=fill_value, bounds_error=False)
+        for ii in range(2):  # check ndarray as well as list here
+            if ii == 1:
+                fill_value = tuple(np.array(f) for f in fill_value)
+            interp = interp1d(self.x5, self.y235, kind=kind, axis=-1,
+                              fill_value=fill_value, bounds_error=False)
+            assert_array_almost_equal(interp(10), [[100, 200, 300]] * 2)
+            assert_array_almost_equal(interp(-10), [[-100, -200, -300]] * 2)
+            assert_array_almost_equal(interp([-10, 10]), [[[-100, 100],
+                                                           [-200, 200],
+                                                           [-300, 300]]] * 2)
+        # broadcastable (2,) lower, broadcastable (2,) upper
+        fill_value = ([-100, -200], [100, 200])
+        assert_raises(ValueError, interp1d, self.x5, self.y235, kind=kind,
+                      axis=-1, fill_value=fill_value, bounds_error=False)
+        for y in (self.y325, self.y225, self.y25):
+            interp = interp1d(self.x5, y, kind=kind, axis=-1,
+                              fill_value=fill_value, bounds_error=False)
+            result = [100, 200]
+            if y.ndim == 3:
+                result = [result] * y.shape[0]
+            assert_array_almost_equal(interp(10), result)
+            result = [-100, -200]
+            if y.ndim == 3:
+                result = [result] * y.shape[0]
+            assert_array_almost_equal(interp(-10), result)
+            result = [[-100, 100], [-200, 200]]
+            if y.ndim == 3:
+                result = [result] * y.shape[0]
+            assert_array_almost_equal(interp([-10, 10]), result)
+
+        # one broadcastable (2, 2) array-like
+        fill_value = [[100, 200], [1000, 2000]]
+        for y in (self.y235, self.y325, self.y25):
+            assert_raises(ValueError, interp1d, self.x5, y, kind=kind,
+                          axis=-1, fill_value=fill_value, bounds_error=False)
+        for ii in range(2):
+            if ii == 1:
+                fill_value = np.array(fill_value)
+            interp = interp1d(self.x5, self.y225, kind=kind, axis=-1,
+                              fill_value=fill_value, bounds_error=False)
+            assert_array_almost_equal(interp(10), [[100, 200], [1000, 2000]])
+            assert_array_almost_equal(interp(-10), [[100, 200], [1000, 2000]])
+            assert_array_almost_equal(interp([-10, 10]), [[[100, 100],
+                                                           [200, 200]],
+                                                          [[1000, 1000],
+                                                           [2000, 2000]]])
+
+        # broadcastable (2, 2) lower, broadcastable (2, 2) upper
+        fill_value = ([[-100, -200], [-1000, -2000]],
+                      [[100, 200], [1000, 2000]])
+        for y in (self.y235, self.y325, self.y25):
+            assert_raises(ValueError, interp1d, self.x5, y, kind=kind,
+                          axis=-1, fill_value=fill_value, bounds_error=False)
+        for ii in range(2):
+            if ii == 1:
+                fill_value = (np.array(fill_value[0]), np.array(fill_value[1]))
+            interp = interp1d(self.x5, self.y225, kind=kind, axis=-1,
+                              fill_value=fill_value, bounds_error=False)
+            assert_array_almost_equal(interp(10), [[100, 200], [1000, 2000]])
+            assert_array_almost_equal(interp(-10), [[-100, -200],
+                                                    [-1000, -2000]])
+            assert_array_almost_equal(interp([-10, 10]), [[[-100, 100],
+                                                           [-200, 200]],
+                                                          [[-1000, 1000],
+                                                           [-2000, 2000]]])
+
+    def test_fill_value(self):
+        # test that two-element fill value works
+        for kind in ('linear', 'nearest', 'cubic', 'slinear', 'quadratic',
+                     'zero'):
+            self._check_fill_value(kind)
+
+    def test_fill_value_writeable(self):
+        # backwards compat: fill_value is a public writeable attribute
+        interp = interp1d(self.x10, self.y10, fill_value=123.0)
+        assert_equal(interp.fill_value, 123.0)
+        interp.fill_value = 321.0
+        assert_equal(interp.fill_value, 321.0)
 
     def _nd_check_interp(self, kind='linear'):
         # Check the behavior when the inputs and outputs are multidimensional.
@@ -419,15 +666,24 @@ class TestAkima1DInterpolator(TestCase):
         yi[:, 1, 1] = 4. * yi_
         assert_allclose(ak(xi), yi)
 
+    def test_degenerate_case_multidimensional(self):
+        # This test is for issue #5683.
+        x = np.array([0, 1, 2])
+        y = np.vstack((x, x**2)).T
+        ak = Akima1DInterpolator(x, y)
+        x_eval = np.array([0.5, 1.5])
+        y_eval = ak(x_eval)
+        assert_allclose(y_eval, np.vstack((x_eval, x_eval**2)).T)
+
     def test_extend(self):
         x = np.arange(0., 11.)
         y = np.array([0., 2., 1., 3., 2., 6., 5.5, 5.5, 2.7, 5.1, 3.])
         ak = Akima1DInterpolator(x, y)
         try:
-            ak.extend()
+            ak.extend(None, None)
         except NotImplementedError as e:
             if str(e) != ("Extending a 1D Akima interpolator is not "
-                    "yet implemented"):
+                          "yet implemented"):
                 raise
         except:
             raise
@@ -504,10 +760,9 @@ class TestPPolyCommon(TestCase):
             assert_equal(np.shape(p(0.5)), ())
             assert_equal(np.shape(p(np.array(0.5))), ())
 
-            if NumpyVersion(np.__version__) >= '1.7.0':
-                # can't use dtype=object (with any numpy; what fails is
-                # constructing the object array here for old numpy)
-                assert_raises(ValueError, p, np.array([[0.1, 0.2], [0.4]]))
+            # can't use dtype=object (with any numpy; what fails is
+            # constructing the object array here for old numpy)
+            assert_raises(ValueError, p, np.array([[0.1, 0.2], [0.4]]))
 
     def test_complex_coef(self):
         np.random.seed(12345)
@@ -520,6 +775,35 @@ class TestPPolyCommon(TestCase):
             for nu in [0, 1, 2]:
                 assert_allclose(p(xp, nu).real, p_re(xp, nu))
                 assert_allclose(p(xp, nu).imag, p_im(xp, nu))
+
+    def test_axis(self):
+        np.random.seed(12345)
+        c = np.random.rand(3, 4, 5, 6, 7, 8)
+        c_s = c.shape
+        xp = np.random.random((1, 2))
+        for axis in (0, 1, 2, 3):
+            k, m = c.shape[axis], c.shape[axis+1]
+            x = np.sort(np.random.rand(m+1))
+            for cls in (PPoly, BPoly):
+                p = cls(c, x, axis=axis)
+                assert_equal(p.c.shape,
+                             c_s[axis:axis+2] + c_s[:axis] + c_s[axis+2:])
+                res = p(xp)
+                targ_shape = c_s[:axis] + xp.shape + c_s[2+axis:]
+                assert_equal(res.shape, targ_shape)
+
+                # deriv/antideriv does not drop the axis
+                for p1 in [cls(c, x, axis=axis).derivative(),
+                           cls(c, x, axis=axis).derivative(2),
+                           cls(c, x, axis=axis).antiderivative(),
+                           cls(c, x, axis=axis).antiderivative(2)]:
+                    assert_equal(p1.axis, p.axis)
+
+        # c array needs two axes for the coefficients and intervals, so
+        # 0 <= axis < c.ndim-1; raise otherwise
+        for axis in (-1, 4, 5, 6):
+            for cls in (BPoly, PPoly):
+                assert_raises(ValueError, cls, **dict(c=c, x=x, axis=axis))
 
 
 class TestPolySubclassing(TestCase):
@@ -1005,11 +1289,100 @@ class TestBPolyCalculus(TestCase):
         m, k = 5, 8   # number of intervals, order
         x = np.sort(np.random.random(m))
         c = np.random.random((k, m-1))
+
+        # test both real and complex coefficients
+        for cc in [c.copy(), c*(1. + 2.j)]:
+            bp = BPoly(cc, x)
+            xp = np.linspace(x[0], x[-1], 21)
+            for i in range(k):
+                assert_allclose(bp(xp, i), bp.derivative(i)(xp))
+
+    def test_antiderivative_simple(self):
+        # f(x) = x        for x \in [0, 1),
+        #        (x-1)/2  for x \in [1, 3]
+        #
+        # antiderivative is then
+        # F(x) = x**2 / 2            for x \in [0, 1), 
+        #        0.5*x*(x/2 - 1) + A  for x \in [1, 3]
+        # where A = 3/4 for continuity at x = 1.
+        x = [0, 1, 3]
+        c = [[0, 0], [1, 1]]
+
+        bp = BPoly(c, x)
+        bi = bp.antiderivative()
+        
+        xx = np.linspace(0, 3, 11)
+        assert_allclose(bi(xx),
+                        np.where(xx < 1, xx**2 / 2.,
+                                         0.5 * xx * (xx/2. - 1) + 3./4),
+                        atol=1e-12, rtol=1e-12)
+
+    def test_der_antider(self):
+        np.random.seed(1234)
+        x = np.sort(np.random.random(11))
+        c = np.random.random((4, 10, 2, 3))
         bp = BPoly(c, x)
 
-        xp = np.linspace(x[0], x[-1], 21)
-        for i in range(k):
-            assert_allclose(bp(xp, i), bp.derivative(i)(xp))
+        xx = np.linspace(x[0], x[-1], 100)
+        assert_allclose(bp.antiderivative().derivative()(xx),
+                        bp(xx), atol=1e-12, rtol=1e-12)
+
+    def test_antider_ppoly(self):
+        np.random.seed(1234)
+        x = np.sort(np.random.random(11))
+        c = np.random.random((4, 10, 2, 3))
+        bp = BPoly(c, x)
+        pp = PPoly.from_bernstein_basis(bp)
+
+        xx = np.linspace(x[0], x[-1], 10)
+
+        assert_allclose(bp.antiderivative(2)(xx),
+                        pp.antiderivative(2)(xx), atol=1e-12, rtol=1e-12)
+
+    def test_antider_continuous(self):
+        np.random.seed(1234)
+        x = np.sort(np.random.random(11))
+        c = np.random.random((4, 10))
+        bp = BPoly(c, x).antiderivative()
+
+        xx = bp.x[1:-1]
+        assert_allclose(bp(xx - 1e-14),
+                        bp(xx + 1e-14), atol=1e-12, rtol=1e-12)
+
+    def test_integrate(self):
+        np.random.seed(1234)
+        x = np.sort(np.random.random(11))
+        c = np.random.random((4, 10))
+        bp = BPoly(c, x)
+        pp = PPoly.from_bernstein_basis(bp)
+        assert_allclose(bp.integrate(0, 1),
+                        pp.integrate(0, 1), atol=1e-12, rtol=1e-12)
+
+    def test_integrate_extrap(self):
+        c = [[1]]
+        x = [0, 1]
+        b = BPoly(c, x)
+
+        # default is extrapolate=True
+        assert_allclose(b.integrate(0, 2), 2., atol=1e-14)
+
+        # .integrate argument overrides self.extrapolate
+        b1 = BPoly(c, x, extrapolate=False)
+        assert_(np.isnan(b1.integrate(0, 2)))
+        assert_allclose(b1.integrate(0, 2, extrapolate=True), 2., atol=1e-14)
+
+    def test_antider_neg(self):
+        # .derivative(-nu) ==> .andiderivative(nu) and vice versa
+        c = [[1]]
+        x = [0, 1]
+        b = BPoly(c, x)
+
+        xx = np.linspace(0, 1, 21)
+        
+        assert_allclose(b.derivative(-1)(xx), b.antiderivative()(xx),
+                        atol=1e-12, rtol=1e-12)
+        assert_allclose(b.derivative(1)(xx), b.antiderivative(-1)(xx),
+                        atol=1e-12, rtol=1e-12)
 
 
 class TestPolyConversions(TestCase):
@@ -1193,6 +1566,23 @@ class TestBPolyFromDerivatives(TestCase):
         yi = np.random.random((m+1, k, 6, 7, 8))
         pp = BPoly.from_derivatives(xi, yi)
         assert_equal(pp.c.shape, (2*k, m, 6, 7, 8))
+
+    def test_gh_5430(self):
+        # At least one of these raises an error unless gh-5430 is
+        # fixed. In py2k an int is implemented using a C long, so
+        # which one fails depends on your system. In py3k there is only
+        # one arbitrary precision integer type, so both should fail.
+        orders = np.int32(1)
+        p = BPoly.from_derivatives([0, 1], [[0], [0]], orders=orders)
+        assert_almost_equal(p(0), 0)
+        orders = np.int64(1)
+        p = BPoly.from_derivatives([0, 1], [[0], [0]], orders=orders)
+        assert_almost_equal(p(0), 0)
+        orders = 1
+        # This worked before; make sure it still works
+        p = BPoly.from_derivatives([0, 1], [[0], [0]], orders=orders)
+        assert_almost_equal(p(0), 0)
+        orders = 1
 
 
 class TestPpform(TestCase):

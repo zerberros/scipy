@@ -67,11 +67,10 @@ class spmatrix(object):
     ndim = 2
 
     def __init__(self, maxprint=MAXPRINT):
-        self.format = self.__class__.__name__[:3]
         self._shape = None
-        if self.format == 'spm':
+        if self.__class__.__name__ == 'spmatrix':
             raise ValueError("This class is not intended"
-                            " to be instantiated directly.")
+                             " to be instantiated directly.")
         self.maxprint = maxprint
 
     def set_shape(self,shape):
@@ -101,8 +100,9 @@ class spmatrix(object):
 
     shape = property(fget=get_shape, fset=set_shape)
 
-    def reshape(self,shape):
-        raise NotImplementedError
+    def reshape(self, shape):
+        raise NotImplementedError("Reshaping not implemented for %s." %
+                                  self.__class__.__name__)
 
     def astype(self, t):
         return self.tocsr().astype(t).asformat(self.format)
@@ -147,18 +147,14 @@ class spmatrix(object):
             raise AttributeError("nnz not defined")
 
     def getformat(self):
-        try:
-            format = self.format
-        except AttributeError:
-            format = 'und'
-        return format
+        return getattr(self, 'format', 'und')
 
     def __repr__(self):
         nnz = self.getnnz()
-        format = self.getformat()
+        _, format_name = _formats[self.getformat()]
         return "<%dx%d sparse matrix of type '%s'\n" \
                "\twith %d stored elements in %s format>" % \
-               (self.shape + (self.dtype.type, nnz, _formats[format][1]))
+               (self.shape + (self.dtype.type, nnz, format_name))
 
     def __str__(self):
         maxprint = self.getmaxprint()
@@ -250,6 +246,9 @@ class spmatrix(object):
 
         """
         return self * other
+
+    def power(self, n, dtype=None):            
+        return self.tocsr().power(n, dtype=dtype)
 
     def __eq__(self, other):
         return self.tocsr().__eq__(other)
@@ -383,6 +382,22 @@ class spmatrix(object):
                 tr = np.asarray(other).transpose()
             return (self.transpose() * tr).transpose()
 
+    #####################################
+    # matmul (@) operator (Python 3.5+) #
+    #####################################
+
+    def __matmul__(self, other):
+        if isscalarlike(other):
+            raise ValueError("Scalar operands are not allowed, "
+                             "use '*' instead")
+        return self.__mul__(other)
+
+    def __rmatmul__(self, other):
+        if isscalarlike(other):
+            raise ValueError("Scalar operands are not allowed, "
+                             "use '*' instead")
+        return self.__rmul__(other)
+
     ####################
     # Other Arithmetic #
     ####################
@@ -486,7 +501,7 @@ class spmatrix(object):
         elif isscalarlike(other):
             raise ValueError('exponent must be an integer')
         else:
-            raise NotImplementedError
+            return NotImplemented
 
     def __getattr__(self, attr):
         if attr == 'A':

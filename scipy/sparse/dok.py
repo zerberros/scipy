@@ -71,10 +71,11 @@ class dok_matrix(spmatrix, IndexMixin, dict):
     >>> from scipy.sparse import dok_matrix
     >>> S = dok_matrix((5, 5), dtype=np.float32)
     >>> for i in range(5):
-    >>>     for j in range(5):
-    >>>         S[i,j] = i+j    # Update element
+    ...     for j in range(5):
+    ...         S[i, j] = i + j    # Update element
 
     """
+    format = 'dok'
 
     def __init__(self, arg1, shape=None, dtype=None, copy=False):
         dict.__init__(self)
@@ -469,10 +470,6 @@ class dok_matrix(spmatrix, IndexMixin, dict):
     def tocsc(self):
         """ Return a copy of this matrix in Compressed Sparse Column format"""
         return self.tocoo().tocsc()
-
-    def toarray(self, order=None, out=None):
-        """See the docstring for `spmatrix.toarray`."""
-        return self.tocoo().toarray(order=order, out=out)
 
     def resize(self, shape):
         """ Resize the matrix in-place to dimensions given by 'shape'.

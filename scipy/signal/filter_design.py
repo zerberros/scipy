@@ -19,11 +19,12 @@ __all__ = ['findfreqs', 'freqs', 'freqz', 'tf2zpk', 'zpk2tf', 'normalize',
            'iirfilter', 'butter', 'cheby1', 'cheby2', 'ellip', 'bessel',
            'band_stop_obj', 'buttord', 'cheb1ord', 'cheb2ord', 'ellipord',
            'buttap', 'cheb1ap', 'cheb2ap', 'ellipap', 'besselap',
-           'filter_dict', 'band_dict', 'BadCoefficients',
-           'tf2sos', 'sos2tf', 'zpk2sos', 'sos2zpk']
+           'BadCoefficients',
+           'tf2sos', 'sos2tf', 'zpk2sos', 'sos2zpk', 'group_delay']
 
 
 class BadCoefficients(UserWarning):
+    """Warning about badly conditioned filter coefficients"""
     pass
 
 abs = absolute
@@ -31,7 +32,7 @@ abs = absolute
 
 def findfreqs(num, den, N):
     """
-    Find an array of frequencies for computing the response of a filter.
+    Find array of frequencies for computing the response of an analog filter.
 
     Parameters
     ----------
@@ -54,7 +55,8 @@ def findfreqs(num, den, N):
 
         H(s) = s / (s^2 + 8s + 25)
 
-    >>> findfreqs([1, 0], [1, 8, 25], N=9)
+    >>> from scipy import signal
+    >>> signal.findfreqs([1, 0], [1, 8, 25], N=9)
     array([  1.00000000e-02,   3.16227766e-02,   1.00000000e-01,
              3.16227766e-01,   1.00000000e+00,   3.16227766e+00,
              1.00000000e+01,   3.16227766e+01,   1.00000000e+02])
@@ -92,16 +94,16 @@ def freqs(b, a, worN=None, plot=None):
 
     Parameters
     ----------
-    b : ndarray
+    b : array_like
         Numerator of a linear filter.
-    a : ndarray
+    a : array_like
         Denominator of a linear filter.
     worN : {None, int}, optional
         If None, then compute at 200 frequencies around the interesting parts
         of the response curve (determined by pole-zero locations).  If a single
         integer, then compute at that many frequencies.  Otherwise, compute the
         response at the angular frequencies (e.g. rad/s) given in `worN`.
-    plot : callable
+    plot : callable, optional
         A callable that takes two arguments. If given, the return parameters
         `w` and `h` are passed to plot. Useful for plotting the frequency
         response inside `freqs`.
@@ -109,7 +111,7 @@ def freqs(b, a, worN=None, plot=None):
     Returns
     -------
     w : ndarray
-        The angular frequencies at which h was computed.
+        The angular frequencies at which `h` was computed.
     h : ndarray
         The frequency response.
 
@@ -170,9 +172,9 @@ def freqz(b, a=1, worN=None, whole=0, plot=None):
 
     Parameters
     ----------
-    b : ndarray
+    b : array_like
         numerator of a linear filter
-    a : ndarray
+    a : array_like
         denominator of a linear filter
     worN : {None, int, array_like}, optional
         If None (default), then compute at 512 frequencies equally spaced
@@ -192,7 +194,8 @@ def freqz(b, a=1, worN=None, whole=0, plot=None):
     Returns
     -------
     w : ndarray
-        The normalized frequencies at which h was computed, in radians/sample.
+        The normalized frequencies at which `h` was computed, in
+        radians/sample.
     h : ndarray
         The frequency response.
 
@@ -246,6 +249,104 @@ def freqz(b, a=1, worN=None, whole=0, plot=None):
         plot(w, h)
 
     return w, h
+
+
+def group_delay(system, w=None, whole=False):
+    r"""Compute the group delay of a digital filter.
+
+    The group delay measures by how many samples amplitude envelopes of
+    various spectral components of a signal are delayed by a filter.
+    It is formally defined as the derivative of continuous (unwrapped) phase::
+
+               d        jw
+     D(w) = - -- arg H(e)
+              dw
+
+    Parameters
+    ----------
+    system : tuple of array_like (b, a)
+        Numerator and denominator coefficients of a filter transfer function.
+    w : {None, int, array-like}, optional
+        If None (default), then compute at 512 frequencies equally spaced
+        around the unit circle.
+        If a single integer, then compute at that many frequencies.
+        If array, compute the delay at the frequencies given
+        (in radians/sample).
+    whole : bool, optional
+        Normally, frequencies are computed from 0 to the Nyquist frequency,
+        pi radians/sample (upper-half of unit-circle).  If `whole` is True,
+        compute frequencies from 0 to ``2*pi`` radians/sample.
+
+    Returns
+    -------
+    w : ndarray
+        The normalized frequencies at which the group delay was computed,
+        in radians/sample.
+    gd : ndarray
+        The group delay.
+
+    Notes
+    -----
+    The similar function in MATLAB is called `grpdelay`.
+
+    If the transfer function :math:`H(z)` has zeros or poles on the unit
+    circle, the group delay at corresponding frequencies is undefined.
+    When such a case arises the warning is raised and the group delay
+    is set to 0 at those frequencies.
+
+    For the details of numerical computation of the group delay refer to [1]_.
+
+    .. versionadded: 0.16.0
+
+    See Also
+    --------
+    freqz : Frequency response of a digital filter
+
+    References
+    ----------
+    .. [1] Richard G. Lyons, "Understanding Digital Signal Processing,
+           3rd edition", p. 830.
+
+    Examples
+    --------
+    >>> from scipy import signal
+    >>> b, a = signal.iirdesign(0.1, 0.3, 5, 50, ftype='cheby1')
+    >>> w, gd = signal.group_delay((b, a))
+
+    >>> import matplotlib.pyplot as plt
+    >>> plt.title('Digital filter group delay')
+    >>> plt.plot(w, gd)
+    >>> plt.ylabel('Group delay [samples]')
+    >>> plt.xlabel('Frequency [rad/sample]')
+    >>> plt.show()
+
+    """
+    if w is None:
+        w = 512
+
+    if isinstance(w, int):
+        if whole:
+            w = np.linspace(0, 2 * pi, w, endpoint=False)
+        else:
+            w = np.linspace(0, pi, w, endpoint=False)
+
+    w = np.atleast_1d(w)
+    b, a = map(np.atleast_1d, system)
+    c = np.convolve(b, a[::-1])
+    cr = c * np.arange(c.size)
+    z = np.exp(-1j * w)
+    num = np.polyval(cr[::-1], z)
+    den = np.polyval(c[::-1], z)
+    singular = np.absolute(den) < 10 * EPSILON
+    if np.any(singular):
+        warnings.warn(
+            "The group delay is singular at frequencies [{0}], setting to 0".
+            format(", ".join("{0:.3f}".format(ws) for ws in w[singular]))
+        )
+
+    gd = np.zeros_like(w)
+    gd[~singular] = np.real(num[~singular] / den[~singular]) - a.size + 1
+    return w, gd
 
 
 def _cplxreal(z, tol=None):
@@ -560,7 +661,7 @@ def tf2sos(b, a, pairing='nearest'):
         Numerator polynomial coefficients.
     a : array_like
         Denominator polynomial coefficients.
-    pairing : {'nearest', 'keep_odd'}
+    pairing : {'nearest', 'keep_odd'}, optional
         The method to use to combine pairs of poles and zeros into sections.
         See `zpk2sos`.
 
@@ -679,7 +780,7 @@ def zpk2sos(z, p, k, pairing='nearest'):
         Poles of the transfer function.
     k : float
         System gain.
-    pairing : {'nearest', 'keep_odd'}
+    pairing : {'nearest', 'keep_odd'}, optional
         The method to use to combine pairs of poles and zeros into sections.
         See Notes below.
 
@@ -705,8 +806,7 @@ def zpk2sos(z, p, k, pairing='nearest'):
     *Algorithms*
 
     The current algorithms are designed specifically for use with digital
-    filters. Although they can operate on analog filters, the results may
-    be sub-optimal.
+    filters. (The output coefficents are not correct for analog filters.)
 
     The steps in the ``pairing='nearest'`` and ``pairing='keep_odd'``
     algorithms are mostly shared. The ``nearest`` algorithm attempts to
@@ -782,7 +882,7 @@ def zpk2sos(z, p, k, pairing='nearest'):
 
     >>> sos = signal.zpk2sos(z, p, k)
 
-    The coefficents of the numerators of the sections:
+    The coefficients of the numerators of the sections:
 
     >>> sos[:, :3]
     array([[ 0.0014154 ,  0.00248707,  0.0014154 ],
@@ -1424,9 +1524,9 @@ def _zpkbilinear(z, p, k, fs):
 
     Parameters
     ----------
-    z : ndarray
+    z : array_like
         Zeros of the analog IIR filter transfer function.
-    p : ndarray
+    p : array_like
         Poles of the analog IIR filter transfer function.
     k : float
         System gain of the analog IIR filter transfer function.
@@ -1465,7 +1565,7 @@ def _zpkbilinear(z, p, k, fs):
 
 
 def _zpklp2lp(z, p, k, wo=1.0):
-    """
+    r"""
     Transform a lowpass filter prototype to a different frequency.
 
     Return an analog low-pass filter with cutoff frequency `wo`
@@ -1474,9 +1574,9 @@ def _zpklp2lp(z, p, k, wo=1.0):
 
     Parameters
     ----------
-    z : ndarray
+    z : array_like
         Zeros of the analog IIR filter transfer function.
-    p : ndarray
+    p : array_like
         Poles of the analog IIR filter transfer function.
     k : float
         System gain of the analog IIR filter transfer function.
@@ -1502,7 +1602,7 @@ def _zpklp2lp(z, p, k, wo=1.0):
     """
     z = atleast_1d(z)
     p = atleast_1d(p)
-    wo = float(wo)  # Avoid np.int wraparound
+    wo = float(wo)  # Avoid int wraparound
 
     degree = _relative_degree(z, p)
 
@@ -1518,7 +1618,7 @@ def _zpklp2lp(z, p, k, wo=1.0):
 
 
 def _zpklp2hp(z, p, k, wo=1.0):
-    """
+    r"""
     Transform a lowpass filter prototype to a highpass filter.
 
     Return an analog high-pass filter with cutoff frequency `wo`
@@ -1527,9 +1627,9 @@ def _zpklp2hp(z, p, k, wo=1.0):
 
     Parameters
     ----------
-    z : ndarray
+    z : array_like
         Zeros of the analog IIR filter transfer function.
-    p : ndarray
+    p : array_like
         Poles of the analog IIR filter transfer function.
     k : float
         System gain of the analog IIR filter transfer function.
@@ -1577,7 +1677,7 @@ def _zpklp2hp(z, p, k, wo=1.0):
 
 
 def _zpklp2bp(z, p, k, wo=1.0, bw=1.0):
-    """
+    r"""
     Transform a lowpass filter prototype to a bandpass filter.
 
     Return an analog band-pass filter with center frequency `wo` and
@@ -1586,9 +1686,9 @@ def _zpklp2bp(z, p, k, wo=1.0, bw=1.0):
 
     Parameters
     ----------
-    z : ndarray
+    z : array_like
         Zeros of the analog IIR filter transfer function.
-    p : ndarray
+    p : array_like
         Poles of the analog IIR filter transfer function.
     k : float
         System gain of the analog IIR filter transfer function.
@@ -1649,7 +1749,7 @@ def _zpklp2bp(z, p, k, wo=1.0, bw=1.0):
 
 
 def _zpklp2bs(z, p, k, wo=1.0, bw=1.0):
-    """
+    r"""
     Transform a lowpass filter prototype to a bandstop filter.
 
     Return an analog band-stop filter with center frequency `wo` and
@@ -1658,9 +1758,9 @@ def _zpklp2bs(z, p, k, wo=1.0, bw=1.0):
 
     Parameters
     ----------
-    z : ndarray
+    z : array_like
         Zeros of the analog IIR filter transfer function.
-    p : ndarray
+    p : array_like
         Poles of the analog IIR filter transfer function.
     k : float
         System gain of the analog IIR filter transfer function.

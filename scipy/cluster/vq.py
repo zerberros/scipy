@@ -84,6 +84,7 @@ from numpy.random import randint
 from numpy import (shape, zeros, sqrt, argmin, minimum, array, newaxis,
     common_type, single, double, take, std, mean)
 import numpy as np
+from scipy._lib._util import _asarray_validated
 
 from . import _vq
 
@@ -92,7 +93,7 @@ class ClusterError(Exception):
     pass
 
 
-def whiten(obs):
+def whiten(obs, check_finite=True):
     """
     Normalize a group of observations on a per feature basis.
 
@@ -113,6 +114,12 @@ def whiten(obs):
         ...        [  3.,   3.,   3.],  #o2
         ...        [  4.,   4.,   4.]]  #o3
 
+    check_finite : bool, optional
+        Whether to check that the input matrices contain only finite numbers.
+        Disabling may give a performance gain, but may result in problems
+        (crashes, non-termination) if the inputs do contain infinities or NaNs.
+        Default: True
+
     Returns
     -------
     result : ndarray
@@ -131,6 +138,7 @@ def whiten(obs):
            [ 1.75976538,  0.7038557 ,  7.21248917]])
 
     """
+    obs = _asarray_validated(obs, check_finite=check_finite)
     std_dev = std(obs, axis=0)
     zero_std_mask = std_dev == 0
     if zero_std_mask.any():
@@ -141,7 +149,7 @@ def whiten(obs):
     return obs / std_dev
 
 
-def vq(obs, code_book):
+def vq(obs, code_book, check_finite=True):
     """
     Assign codes from a code book to observations.
 
@@ -172,6 +180,12 @@ def vq(obs, code_book):
          ...             [  1.,   2.,   3.,   4.],  #c1
          ...             [  1.,   2.,   3.,   4.]]  #c2
 
+    check_finite : bool, optional
+        Whether to check that the input matrices contain only finite numbers.
+        Disabling may give a performance gain, but may result in problems
+        (crashes, non-termination) if the inputs do contain infinities or NaNs.
+        Default: True
+
     Returns
     -------
     code : ndarray
@@ -193,15 +207,11 @@ def vq(obs, code_book):
     (array([1, 1, 0],'i'), array([ 0.43588989,  0.73484692,  0.83066239]))
 
     """
+    obs = _asarray_validated(obs, check_finite=check_finite)
+    code_book = _asarray_validated(code_book, check_finite=check_finite)
     ct = common_type(obs, code_book)
 
-    # avoid copying when dtype is the same
-    # should be replaced with c_obs = astype(ct, copy=False)
-    # when we get to numpy 1.7.0
-    if obs.dtype != ct:
-        c_obs = obs.astype(ct)
-    else:
-        c_obs = obs
+    c_obs = obs.astype(ct, copy=False)
 
     if code_book.dtype != ct:
         c_code_book = code_book.astype(ct)
@@ -215,7 +225,7 @@ def vq(obs, code_book):
     return results
 
 
-def py_vq(obs, code_book):
+def py_vq(obs, code_book, check_finite=True):
     """ Python version of vq algorithm.
 
     The algorithm computes the euclidian distance between each
@@ -228,6 +238,11 @@ def py_vq(obs, code_book):
     code_book : ndarray
         Code book to use. Same format than obs. Should have same number of
         features (eg columns) than obs.
+    check_finite : bool, optional
+        Whether to check that the input matrices contain only finite numbers.
+        Disabling may give a performance gain, but may result in problems
+        (crashes, non-termination) if the inputs do contain infinities or NaNs.
+        Default: True
 
     Returns
     -------
@@ -247,6 +262,9 @@ def py_vq(obs, code_book):
     It is about 20 times slower than the C version.
 
     """
+    obs = _asarray_validated(obs, check_finite=check_finite)
+    code_book = _asarray_validated(code_book, check_finite=check_finite)
+
     # n = number of observations
     # d = number of features
     if np.ndim(obs) == 1:
@@ -310,7 +328,7 @@ def _py_vq_1d(obs, code_book):
     return code, sqrt(min_dist)
 
 
-def py_vq2(obs, code_book):
+def py_vq2(obs, code_book, check_finite=True):
     """2nd Python version of vq algorithm.
 
     The algorithm simply computes the euclidian distance between each
@@ -323,6 +341,11 @@ def py_vq2(obs, code_book):
     code_book : ndarray
         Code book to use. Same format than obs. Should have same number of
         features (eg columns) than obs.
+    check_finite : bool, optional
+        Whether to check that the input matrices contain only finite numbers.
+        Disabling may give a performance gain, but may result in problems
+        (crashes, non-termination) if the inputs do contain infinities or NaNs.
+        Default: True
 
     Returns
     -------
@@ -341,6 +364,8 @@ def py_vq2(obs, code_book):
     features, and O = number of codes.
 
     """
+    obs = _asarray_validated(obs, check_finite=check_finite)
+    code_book = _asarray_validated(code_book, check_finite=check_finite)
     d = shape(obs)[1]
 
     # code books and observations should have same number of features
@@ -410,7 +435,7 @@ def _kmeans(obs, guess, thresh=1e-5):
     return code_book, avg_dist[-1]
 
 
-def kmeans(obs, k_or_guess, iter=20, thresh=1e-5):
+def kmeans(obs, k_or_guess, iter=20, thresh=1e-5, check_finite=True):
     """
     Performs k-means on a set of observation vectors forming k clusters.
 
@@ -450,6 +475,12 @@ def kmeans(obs, k_or_guess, iter=20, thresh=1e-5):
        distortion since the last k-means iteration is less than
        or equal to thresh.
 
+    check_finite : bool, optional
+        Whether to check that the input matrices contain only finite numbers.
+        Disabling may give a performance gain, but may result in problems
+        (crashes, non-termination) if the inputs do contain infinities or NaNs.
+        Default: True
+
     Returns
     -------
     codebook : ndarray
@@ -487,27 +518,38 @@ def kmeans(obs, k_or_guess, iter=20, thresh=1e-5):
     >>> whitened = whiten(features)
     >>> book = array((whitened[0],whitened[2]))
     >>> kmeans(whitened,book)
-    (array([[ 2.3110306 ,  2.86287398],
+    (array([[ 2.3110306 ,  2.86287398],    # random
            [ 0.93218041,  1.24398691]]), 0.85684700941625547)
 
     >>> from numpy import random
     >>> random.seed((1000,2000))
     >>> codes = 3
     >>> kmeans(whitened,codes)
-    (array([[ 2.3110306 ,  2.86287398],
+    (array([[ 2.3110306 ,  2.86287398],    # random
            [ 1.32544402,  0.65607529],
            [ 0.40782893,  2.02786907]]), 0.5196582527686241)
 
     """
+    obs = _asarray_validated(obs, check_finite=check_finite)
     if int(iter) < 1:
         raise ValueError('iter must be at least 1.')
-    if type(k_or_guess) == type(array([])):
-        guess = k_or_guess
+
+    # Determine whether a count (scalar) or an initial guess (array) was passed.
+    k = None
+    guess = None
+    try:
+        k = int(k_or_guess)
+    except TypeError:
+        guess = _asarray_validated(k_or_guess, check_finite=check_finite)
+
+    if guess is not None:
         if guess.size < 1:
             raise ValueError("Asked for 0 cluster ? initial book was %s" %
                              guess)
         result = _kmeans(obs, guess, thresh=thresh)
     else:
+        if k != k_or_guess:
+            raise ValueError('if k_or_guess is a scalar, it must be an integer')
         # initialize best distance value to a large value
         best_dist = np.inf
         No = obs.shape[0]
@@ -586,9 +628,20 @@ def _krandinit(data, k):
         x = np.dot(x, np.linalg.cholesky(cov).T) + mu
         return x
 
+    def init_rank_def(data):
+        # initialize when the covariance matrix is rank deficient
+        mu = np.mean(data, axis=0)
+        _, s, vh = np.linalg.svd(data - mu, full_matrices=False)
+        x = np.random.randn(k, s.size)
+        sVh = s[:, None] * vh / np.sqrt(data.shape[0] - 1)
+        x = np.dot(x, sVh) + mu
+        return x
+
     nd = np.ndim(data)
     if nd == 1:
         return init_rank1(data)
+    elif data.shape[1] > data.shape[0]:
+        return init_rank_def(data)
     else:
         return init_rankn(data)
 
@@ -610,7 +663,7 @@ _valid_miss_meth = {'warn': _missing_warn, 'raise': _missing_raise}
 
 
 def kmeans2(data, k, iter=10, thresh=1e-5, minit='random',
-        missing='warn'):
+        missing='warn', check_finite=True):
     """
     Classify a set of observations into k clusters using the k-means algorithm.
 
@@ -628,15 +681,15 @@ def kmeans2(data, k, iter=10, thresh=1e-5, minit='random',
         centroids to generate. If `minit` initialization string is
         'matrix', or if a ndarray is given instead, it is
         interpreted as initial cluster to use instead.
-    iter : int
+    iter : int, optional
         Number of iterations of the k-means algrithm to run. Note
         that this differs in meaning from the iters parameter to
         the kmeans function.
-    thresh : float
+    thresh : float, optional
         (not used yet)
-    minit : string
+    minit : str, optional
         Method for initialization. Available methods are 'random',
-        'points', 'uniform', and 'matrix':
+        'points', and 'matrix':
 
         'random': generate k centroids from a Gaussian with mean and
         variance estimated from the data.
@@ -644,18 +697,20 @@ def kmeans2(data, k, iter=10, thresh=1e-5, minit='random',
         'points': choose k observations (rows) at random from data for
         the initial centroids.
 
-        'uniform': generate k observations from the data from a uniform
-        distribution defined by the data set (unsupported).
-
         'matrix': interpret the k parameter as a k by M (or length k
         array for one-dimensional data) array of initial centroids.
-    missing : string
+    missing : str, optional
         Method to deal with empty clusters. Available methods are
         'warn' and 'raise':
 
         'warn': give a warning and continue.
 
         'raise': raise an ClusterError and terminate the algorithm.
+    check_finite : bool, optional
+        Whether to check that the input matrices contain only finite numbers.
+        Disabling may give a performance gain, but may result in problems
+        (crashes, non-termination) if the inputs do contain infinities or NaNs.
+        Default: True
 
     Returns
     -------
@@ -667,6 +722,7 @@ def kmeans2(data, k, iter=10, thresh=1e-5, minit='random',
         i'th observation is closest to.
 
     """
+    data = _asarray_validated(data, check_finite=check_finite)
     if missing not in _valid_miss_meth:
         raise ValueError("Unkown missing method: %s" % str(missing))
     # If data is rank 1, then we have 1 dimension problem.

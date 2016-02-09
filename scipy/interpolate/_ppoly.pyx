@@ -6,7 +6,6 @@ local power basis.
 
 from .polyint import _Interpolator1D
 import numpy as np
-cimport numpy as cnp
 
 cimport cython
 
@@ -58,7 +57,7 @@ def evaluate(double_or_complex[:,:,::1] c,
         Order of derivative to evaluate.  The derivative is evaluated
         piecewise and may have discontinuities.
     extrapolate : int, optional
-        Whether to extrapolate to ouf-of-bounds points based on first
+        Whether to extrapolate to out-of-bounds points based on first
         and last intervals, or to return NaNs.
     out : ndarray, shape (r, n)
         Value of each polynomial at each of the input points.
@@ -188,7 +187,7 @@ def integrate(double_or_complex[:,:,::1] c,
     b : double
         End point of integration.
     extrapolate : int, optional
-        Whether to extrapolate to ouf-of-bounds points based on first
+        Whether to extrapolate to out-of-bounds points based on first
         and last intervals, or to return NaNs.
     out : ndarray, shape (n,)
         Integral of the piecewise polynomial, assuming the polynomial
@@ -402,7 +401,7 @@ cdef int find_interval(double[::1] x,
         Interval where a previous point was found
     extrapolate : int, optional
         Whether to return the last of the first interval if the
-        point is ouf-of-bounds. 
+        point is out-of-bounds. 
 
     Returns
     -------
@@ -848,8 +847,7 @@ def evaluate_bernstein(double_or_complex[:,:,::1] c,
              double[::1] xp,
              int nu,
              int extrapolate,
-             double_or_complex[:,::1] out,
-             cnp.dtype dt):
+             double_or_complex[:,::1] out):
     """
     Evaluate a piecewise polynomial in the Bernstein basis.
 
@@ -867,7 +865,7 @@ def evaluate_bernstein(double_or_complex[:,:,::1] c,
         Order of derivative to evaluate.  The derivative is evaluated
         piecewise and may have discontinuities.
     extrapolate : int, optional
-        Whether to extrapolate to ouf-of-bounds points based on first
+        Whether to extrapolate to out-of-bounds points based on first
         and last intervals, or to return NaNs.
     out : ndarray, shape (r, n)
         Value of each polynomial at each of the input points.
@@ -894,8 +892,11 @@ def evaluate_bernstein(double_or_complex[:,:,::1] c,
         raise ValueError("x and c have incompatible shapes")
 
     if nu > 0:
-        wrk = np.empty((c.shape[0]-nu, 1, 1), dtype=dt)
-
+        if double_or_complex is double_complex:
+            wrk = np.empty((c.shape[0]-nu, 1, 1), dtype=np.complex_)
+        else:
+            wrk = np.empty((c.shape[0]-nu, 1, 1), dtype=np.float_)
+        
     # evaluate
     interval = 0
 
